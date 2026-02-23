@@ -12,6 +12,14 @@ exporters:
       enabled: true
     mapping:
       mode: otel
+  elasticsearch/es:
+    endpoints:
+      - ${env:ELASTICSEARCH_ENDPOINT}
+    api_key: ${env:ELASTICSEARCH_API_KEY}
+  elasticsearch/motlp:
+    endpoints:
+      - ${env:ELASTICSEARCH_MOTLP_ENDPOINT}
+    api_key: ${env:ELASTICSEARCH_API_KEY}
 
 receivers:
   otlp:
@@ -146,6 +154,11 @@ processors:
           - replace_match(name, "GET /api/products/*", "GET /api/products/{productId}")
   # [Elastic APM Processor](https://www.elastic.co/docs/reference/edot-collector/components/elasticapmprocessor)
   elasticapm: {} # The processor enriches traces with Elastic APM specific requirements.
+  transform/logs-streams:
+    log_statements:
+      - context: resource
+        statements:
+          - set(attributes["elasticsearch.index"], "logs")
 
 connectors:
   spanmetrics:
@@ -157,14 +170,15 @@ service:
     logs:
       exporters:
         - debug
-        - elasticsearch/otel
+        - elasticsearch/motlp
       processors:
         - batch
+        - transform/logs-streams
       receivers:
         - otlp
     metrics/infra/otel:
       exporters:
-        - elasticsearch/otel
+        - elasticsearch/motlp
         - debug
       processors:
         - batch/metrics
@@ -173,34 +187,31 @@ service:
         - hostmetrics
     metrics:
       exporters:
-        - elasticsearch/otel
-        - elasticapm
+        - elasticsearch/motlp
+#        - elasticapm #TODO: Uncomment this when we need to send traces to Elastic non-motlp endpoint
         - debug
       processors:
         - batch/metrics
       receivers:
         - httpcheck/frontendproxy
         - otlp
-        - spanmetrics
+#        - spanmetrics #TODO: Uncomment this when we need to send traces to Elastic non-motlp endpoint
     traces:
       exporters:
-        - elasticsearch/otel
+        - elasticsearch/motlp
         - debug
-        - spanmetrics
-        - elasticapm
+#        - spanmetrics #TODO: Uncomment this when we need to send traces to Elastic non-motlp endpoint
+#        - elasticapm #TODO: Uncomment this when we need to send traces to Elastic non-motlp endpoint
       processors:
         - transform
         - batch
-        - elasticapm
+#        - elasticapm #TODO: Uncomment this when we need to send traces to Elastic non-motlp endpoint
       receivers:
         - otlp
-    metrics/aggregated-otel-metrics:
-      receivers:
-        - elasticapm
-      processors:
-      exporters:
-        - debug
-        - elasticsearch/otel
-
-
-
+    # metrics/aggregated-otel-metrics: #TODO: Uncomment this when we need to send traces to Elastic non-motlp endpoint
+    #   receivers:
+    #     - elasticapm
+    #   processors:
+    #   exporters:
+    #     - debug
+    #     - elasticsearch/otel

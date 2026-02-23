@@ -3,7 +3,7 @@
 set -eu
 
 # Constants
-ELASTIC_STACK_VERSION="9.2.0"
+ELASTIC_STACK_VERSION="9.3.0"
 ENV_OVERRIDE_FILE=".env.override"
 NAMESPACE="opentelemetry-operator-system"
 HELM_REPO_NAME="open-telemetry"
@@ -16,7 +16,7 @@ DEMO_HELM_VERSION='0.38.3'
 KUBE_STACK_RELEASE="opentelemetry-kube-stack"
 KUBE_STACK_CHART="open-telemetry/opentelemetry-kube-stack"
 KUBE_STACK_VERSION='0.10.5'
-KUBE_STACK_VALUES_URL_CLOUD='https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v'$ELASTIC_STACK_VERSION'/deploy/helm/edot-collector/kube-stack/values.yaml'
+KUBE_STACK_VALUES_URL_CLOUD='https://raw.githubusercontent.com/ramp-km/rkm-otel-configs/refs/heads/edot_values_with_motlp_%26_logsStreams/edot/edot-values.yaml'
 KUBE_STACK_VALUES_URL_SERVERLESS='https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v'$ELASTIC_STACK_VERSION'/deploy/helm/edot-collector/kube-stack/managed_otlp/values.yaml'
 SECRET_NAME='elastic-secret-otel'
 
@@ -168,7 +168,8 @@ check_existing_credentials() {
     return 1
   fi
 
-  elasticsearch_endpoint=$(grep "^ELASTICSEARCH_ENDPOINT=" "$ENV_OVERRIDE_FILE" | cut -d'=' -f2- | tr -d '"')
+#  elasticsearch_endpoint=$(grep "^ELASTICSEARCH_ENDPOINT=" "$ENV_OVERRIDE_FILE" | cut -d'=' -f2- | tr -d '"')
+  elasticsearch_endpoint=$(grep "^ELASTICSEARCH_MOTLP_ENDPOINT=" "$ENV_OVERRIDE_FILE" | cut -d'=' -f2- | tr -d '"')
   elasticsearch_api_key=$(grep "^ELASTICSEARCH_API_KEY=" "$ENV_OVERRIDE_FILE" | cut -d'=' -f2- | tr -d '"')
 
   if [ -n "$elasticsearch_endpoint" ] && [ -n "$elasticsearch_api_key" ] &&
