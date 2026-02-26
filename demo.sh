@@ -16,6 +16,8 @@ DEMO_HELM_VERSION='0.38.3'
 KUBE_STACK_RELEASE="opentelemetry-kube-stack"
 KUBE_STACK_CHART="open-telemetry/opentelemetry-kube-stack"
 KUBE_STACK_VERSION='0.10.5'
+# Prefer local values when present (e.g. sibling repo rkm-otel-configs)
+KUBE_STACK_VALUES_LOCAL_CLOUD="../rkm-otel-configs/edot/edot-values.yaml"
 KUBE_STACK_VALUES_URL_CLOUD='https://raw.githubusercontent.com/ramp-km/rkm-otel-configs/refs/heads/edot_values_with_motlp_%26_logsStreams/edot/edot-values.yaml'
 KUBE_STACK_VALUES_URL_SERVERLESS='https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v'$ELASTIC_STACK_VERSION'/deploy/helm/edot-collector/kube-stack/managed_otlp/values.yaml'
 SECRET_NAME='elastic-secret-otel'
@@ -227,16 +229,21 @@ apply_k8s_secret() {
 install_kube_stack() {
   case "$deployment_type" in
   cloud-hosted)
-    VALUES_URL="$KUBE_STACK_VALUES_URL_CLOUD"
+    if [ -f "$KUBE_STACK_VALUES_LOCAL_CLOUD" ]; then
+      VALUES_SOURCE="$KUBE_STACK_VALUES_LOCAL_CLOUD"
+      echo "✅ Using local values: $KUBE_STACK_VALUES_LOCAL_CLOUD"
+    else
+      VALUES_SOURCE="$KUBE_STACK_VALUES_URL_CLOUD"
+    fi
     ;;
   serverless)
-    VALUES_URL="$KUBE_STACK_VALUES_URL_SERVERLESS"
+    VALUES_SOURCE="$KUBE_STACK_VALUES_URL_SERVERLESS"
     ;;
   esac
 
   helm upgrade --install "$KUBE_STACK_RELEASE" "$KUBE_STACK_CHART" \
     --namespace "$NAMESPACE" \
-    --values "$VALUES_URL" \
+    --values "$VALUES_SOURCE" \
     --version "$KUBE_STACK_VERSION"
 }
 
