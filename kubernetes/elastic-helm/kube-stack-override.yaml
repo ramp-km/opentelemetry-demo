@@ -1,0 +1,25 @@
+# Override values to fix CRD validation errors when using upstream opentelemetry-kube-stack.
+# The OpenTelemetry Operator CRDs require array types, not null.
+# See: https://github.com/elastic/elastic-agent/tree/main/deploy/helm/edot-collector/kube-stack
+
+# Fix: Instrumentation spec.env must be array, not null.
+# Chart emits null when env is empty; CRD requires array.
+instrumentation:
+  env:
+    - name: _HELM_SPEC_ENV_ARRAY_FIX
+      value: "placeholder"
+
+# Fix: Gateway collector CRD validation errors for both cloud-hosted and serverless.
+# - Top-level processors must be an object, not null (serverless has no processors defined).
+# - metrics/aggregated-otel-metrics pipeline requires receivers, processors, and exporters arrays.
+collectors:
+  gateway:
+    config:
+      processors:
+        batch: {}
+      service:
+        pipelines:
+          metrics/aggregated-otel-metrics:
+            receivers: [otlp]
+            processors: []
+            exporters: [debug]

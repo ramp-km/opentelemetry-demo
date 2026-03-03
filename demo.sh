@@ -3,7 +3,7 @@
 set -eu
 
 # Constants
-ELASTIC_STACK_VERSION="9.2.0"
+ELASTIC_STACK_VERSION="9.3.0"
 ENV_OVERRIDE_FILE=".env.override"
 NAMESPACE="opentelemetry-operator-system"
 HELM_REPO_NAME="open-telemetry"
@@ -223,6 +223,8 @@ apply_k8s_secret() {
   esac
 }
 
+KUBE_STACK_OVERRIDE="kubernetes/elastic-helm/kube-stack-override.yaml"
+
 install_kube_stack() {
   case "$deployment_type" in
   cloud-hosted)
@@ -236,6 +238,7 @@ install_kube_stack() {
   helm upgrade --install "$KUBE_STACK_RELEASE" "$KUBE_STACK_CHART" \
     --namespace "$NAMESPACE" \
     --values "$VALUES_URL" \
+    -f "$KUBE_STACK_OVERRIDE" \
     --version "$KUBE_STACK_VERSION"
 }
 
