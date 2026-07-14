@@ -1,6 +1,22 @@
-# Override values to fix CRD validation errors when using upstream opentelemetry-kube-stack.
-# The OpenTelemetry Operator CRDs require array types, not null.
+# Override values to fix CRD validation errors when using upstream opentelemetry-kube-stack on EKS.
 # See: https://github.com/elastic/elastic-agent/tree/main/deploy/helm/edot-collector/kube-stack
+#
+# EKS (resourcedetection/eks) on cluster-stats (Deployment):
+#   The EKS detector calls EC2 DescribeInstances to get the cluster name, which requires AWS
+#   credentials from EC2 IMDS. The cluster-stats pod runs without hostNetwork and without IRSA,
+#   so IMDS is unreachable (EC2 hop limit = 1). The detector crashes the pipeline on startup.
+#
+#   Fix: remove resourcedetection/eks from cluster-stats pipelines. Set k8s.cluster.name
+#   explicitly via OTEL_RESOURCE_ATTRIBUTES, which resourcedetection/env picks up.
+#   Update EKS_CLUSTER_NAME if the cluster is renamed.
+#
+# EKS (resourcedetection/eks) on daemon (DaemonSet):
+#   The daemon uses hostNetwork: true, so IMDS is reachable. The detector works correctly
+#   but requires node_from_env_var to be set (defaults to "" in this chart version, causing
+#   "node name is empty" if omitted). Fix: set node_from_env_var: OTEL_K8S_NODE_NAME.
+#
+# Use with upstream managed_otlp values:
+#   https://github.com/elastic/elastic-agent/blob/main/deploy/helm/edot-collector/kube-stack/managed_otlp/values.yaml
 
 # Fix: Instrumentation spec.env must be array, not null.
 # Chart emits null when env is empty; CRD requires array.
@@ -13,6 +29,47 @@ instrumentation:
 # - Top-level processors must be an object, not null (serverless has no processors defined).
 # - metrics/aggregated-otel-metrics pipeline requires receivers, processors, and exporters arrays.
 collectors:
+  cluster:
+    # Upstream chart inherits defaultCRConfig resources (often 128Mi limit); cluster-stats
+    # (k8s_cluster + k8s_events + Elastic agent) OOMs at that size.
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+    env:
+      - name: ELASTIC_AGENT_OTEL
+        value: '"true"'
+      # Set k8s.cluster.name since resourcedetection/eks is removed from cluster-stats pipelines.
+      # resourcedetection/env reads OTEL_RESOURCE_ATTRIBUTES and sets the attribute.
+      - name: OTEL_RESOURCE_ATTRIBUTES
+        value: 'k8s.cluster.name=ram-eks'
+    config:
+      service:
+        pipelines:
+          # Remove resourcedetection/eks from cluster-stats: the Deployment has no IMDS access
+          # (no hostNetwork, no IRSA), so the EKS detector cannot obtain AWS credentials.
+          logs:
+            processors: [resourcedetection/env, resourcedetection/gcp, resourcedetection/aks, resource/hostname]
+          metrics:
+            processors: [k8sattributes, resourcedetection/env, resourcedetection/gcp, resourcedetection/aks, resource/hostname]
+  daemon:
+    env:
+      - name: ELASTIC_AGENT_OTEL
+        value: '"true"'
+      - name: OTEL_K8S_NODE_NAME
+        valueFrom:
+          fieldRef:
+            fieldPath: spec.nodeName
+    config:
+      processors:
+        # node_from_env_var must be set explicitly; chart defaults it to "" in this version,
+        # which causes os.Getenv("") == "" → "node name is empty" startup failure.
+        resourcedetection/eks:
+          eks:
+            node_from_env_var: OTEL_K8S_NODE_NAME
   gateway:
     config:
       processors:
